@@ -3,6 +3,7 @@ package controlleur.source;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.reflect.Method;
 import java.net.URLDecoder;
 import java.util.HashMap;
@@ -10,6 +11,7 @@ import java.util.Map;
 
 import controlleur.annotation.AnnotationControlleur;
 import controlleur.annotation.Get;
+import controlleur.fonction.Reflection;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -89,7 +91,19 @@ public class FrontController extends HttpServlet {
 
             if (key.equals(url)) {
                 test++;
-                valiny += "Pour cette liens que vous avez tapez "+ req.getRequestURL() + " le nom du Controlleur c'est "+ value.getClassName() +" avec la methode "+ value.getMethodName() ;
+                try {
+                    Class<?> obj = Class.forName(value.getClassName());
+                    Object objInstance = obj.getDeclaredConstructor().newInstance(); 
+                    String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(), null);
+                    valiny += reponse;
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    StringWriter sw = new StringWriter();
+                    PrintWriter pw = new PrintWriter(sw);
+                    e.printStackTrace(pw);
+                    String stackTrace = sw.toString();
+                    valiny += "\n Exception: " + e.toString() + "\n" + stackTrace;
+                }
             }
         }
         if (test == 0) {
