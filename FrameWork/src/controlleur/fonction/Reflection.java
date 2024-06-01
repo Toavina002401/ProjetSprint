@@ -17,13 +17,19 @@ public class Reflection {
         return valiny;
     }
 
-    public static void execMethode(Object obj, String methodeName, Object[] parametre) throws Exception {
-        Class<?>[] parameterTypes = new Class<?>[parametre.length];
-        for (int i = 0; i < parametre.length; i++) {
-            parameterTypes[i] = parametre[i].getClass();
+    public static Object execMethode(Object obj, String methodeName, Object[] parametre) throws Exception {
+        Class<?>[] parameterTypes;
+        if (parametre == null) {
+            parameterTypes = new Class<?>[0];
+        } else {
+            parameterTypes = new Class<?>[parametre.length];
+            for (int i = 0; i < parametre.length; i++) {
+                parameterTypes[i] = parametre[i].getClass();
+            }
         }
         Method method = obj.getClass().getDeclaredMethod(methodeName, parameterTypes);
-        method.invoke(obj, parametre);
+        Object valiny = method.invoke(obj, parametre);
+        return valiny;
     }
 
     public static String execMethodeController(Object obj, String methodeName, Object[] parametre) throws Exception {
@@ -41,7 +47,14 @@ public class Reflection {
         if (result instanceof String) {
             return (String) result;
         } else {
-            return "La methode appelee ne retourne pas un String";
+            String valiny = "";
+            if (result.getClass().getTypeName().compareTo("controlleur.fonction.ModelView")==0) {
+                valiny = result.getClass().getTypeName();
+            }
+            else{
+                valiny = "Erreur: La methode appelee ne retourne pas un String ou une ModelView ";
+            } 
+            return valiny;
         }
     }
 }

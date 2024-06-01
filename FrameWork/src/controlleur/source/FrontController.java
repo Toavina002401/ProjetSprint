@@ -11,6 +11,7 @@ import java.util.Map;
 
 import controlleur.annotation.AnnotationControlleur;
 import controlleur.annotation.Get;
+import controlleur.fonction.ModelView;
 import controlleur.fonction.Reflection;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
@@ -95,7 +96,20 @@ public class FrontController extends HttpServlet {
                     Class<?> obj = Class.forName(value.getClassName());
                     Object objInstance = obj.getDeclaredConstructor().newInstance(); 
                     String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(), null);
-                    valiny += reponse;
+                    if (reponse.compareTo("controlleur.fonction.ModelView")==0) {
+                        ModelView mv = (ModelView)Reflection.execMethode(objInstance, value.getMethodName(), null);
+                        String cleHash ="";
+                        Object valueHash = new Object();
+                        for (String cles : mv.getData().keySet()) {
+                            cleHash = cles;
+                            valueHash = mv.getData().get(cles);
+                            break;
+                        }
+                        req.setAttribute(cleHash, valueHash);
+                        req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
+                    }else{
+                        valiny += reponse;
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                     StringWriter sw = new StringWriter();
