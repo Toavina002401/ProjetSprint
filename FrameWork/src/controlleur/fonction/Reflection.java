@@ -52,7 +52,7 @@ public class Reflection {
                 valiny = result.getClass().getTypeName();
             }
             else{
-                valiny = "Erreur: La methode appelee ne retourne pas un String ou une ModelView ";
+                throw new Exception("Erreur: Type de retour que l'on connait pas. La methode droit etre une String ou une ModelView ");
             } 
             return valiny;
         }
