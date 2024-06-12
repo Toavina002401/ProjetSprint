@@ -4,12 +4,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.net.URLDecoder;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
 import controlleur.annotation.AnnotationControlleur;
 import controlleur.annotation.Get;
+import controlleur.annotation.Param;
 import controlleur.fonction.ModelView;
 import controlleur.fonction.Reflection;
 import jakarta.servlet.ServletContext;
@@ -118,20 +121,63 @@ public class FrontController extends HttpServlet {
                 try {
                     Class<?> obj = Class.forName(value.getClassName());
                     Object objInstance = obj.getDeclaredConstructor().newInstance(); 
-                    String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(), null);
-                    if (reponse.compareTo("controlleur.fonction.ModelView")==0) {
-                        ModelView mv = (ModelView)Reflection.execMethode(objInstance, value.getMethodName(), null);
-                        String cleHash ="";
-                        Object valueHash = new Object();
-                        for (String cles : mv.getData().keySet()) {
-                            cleHash = cles;
-                            valueHash = mv.getData().get(cles);
-                            break;
+                    if (Reflection.findParam(objInstance, value.getMethodName())) {
+                        Parameter[] objParametre = Reflection.getParam(objInstance, value.getMethodName());
+                        Object[] objValeur = new Object[objParametre.length];
+                        Enumeration<String> reqParametre = req.getParameterNames();
+                        for (int i = 0; i < objParametre.length; i++) {
+                            int verif = 0;
+                            while (reqParametre.hasMoreElements()) {
+                                String paramName = reqParametre.nextElement();
+                                if (objParametre[i].getName().compareTo(paramName)==0) {
+                                    objValeur[i] = Reflection.castParameter(req.getParameter(paramName), objParametre[i].getParameterizedType().getTypeName());
+                                    verif++;
+                                    break;
+                                }
+                                if (objParametre[i].isAnnotationPresent(Param.class)) {
+                                    if (objParametre[i].getAnnotation(Param.class).value().compareTo(paramName)==0) {
+                                        objValeur[i] = Reflection.castParameter(req.getParameter(paramName), objParametre[i].getParameterizedType().getTypeName());
+                                        verif++;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (verif == 0) {
+                                objValeur[i] = Reflection.castParameter(null, objParametre[i].getParameterizedType().getTypeName());
+                            }
                         }
-                        req.setAttribute(cleHash, valueHash);
-                        req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
+
+                        String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(), objValeur);
+                        if (reponse.compareTo("controlleur.fonction.ModelView")==0) {
+                            ModelView mv = (ModelView)Reflection.execMethode(objInstance, value.getMethodName(), objValeur);
+                            String cleHash ="";
+                            Object valueHash = new Object();
+                            for (String cles : mv.getData().keySet()) {
+                                cleHash = cles;
+                                valueHash = mv.getData().get(cles);
+                                req.setAttribute(cleHash, valueHash);
+                            }
+                            req.setAttribute("baseUrl", nameProjet);
+                            req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
+                        }else{
+                            description += reponse;
+                        }
                     }else{
-                        description += reponse;
+                        String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(), null);
+                        if (reponse.compareTo("controlleur.fonction.ModelView")==0) {
+                            ModelView mv = (ModelView)Reflection.execMethode(objInstance, value.getMethodName(), null);
+                            String cleHash ="";
+                            Object valueHash = new Object();
+                            for (String cles : mv.getData().keySet()) {
+                                cleHash = cles;
+                                valueHash = mv.getData().get(cles);
+                                req.setAttribute(cleHash, valueHash);
+                            }
+                            req.setAttribute("baseUrl", nameProjet);
+                            req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
+                        }else{
+                            description += reponse;
+                        }
                     }
                 } catch (Exception e) {
                     throw new Exception(e.getMessage());

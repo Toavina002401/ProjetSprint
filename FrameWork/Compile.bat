@@ -20,7 +20,7 @@ rem Copie les sources dans le tempsrc
 for /r "src" %%f in (*.java) do copy "%%f" "%tempsrc%"
 
 rem Compilation de tous les fichiers Java du répertoire tempsrc
-javac -cp "lib/*" -d "." "%tempsrc%\*.java"
+javac -parameters -cp "lib/*" -d "." "%tempsrc%\*.java"
 
 rem Decompresser en jar
 jar -cf "%Belouh%.jar" "%controlleur%"
