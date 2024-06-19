@@ -3,6 +3,7 @@ package controlleur.source;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URLDecoder;
@@ -10,7 +11,9 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
+import controlleur.annotation.AnnotationAttribut;
 import controlleur.annotation.AnnotationControlleur;
+import controlleur.annotation.AnnotationObject;
 import controlleur.annotation.Get;
 import controlleur.annotation.Param;
 import controlleur.fonction.ModelView;
@@ -123,27 +126,72 @@ public class FrontController extends HttpServlet {
                     Object objInstance = obj.getDeclaredConstructor().newInstance(); 
                     if (Reflection.findParam(objInstance, value.getMethodName())) {
                         Parameter[] objParametre = Reflection.getParam(objInstance, value.getMethodName());
+                        // String[] objParametreName = Reflection.parameterNames(objInstance, value.getMethodName());
                         Object[] objValeur = new Object[objParametre.length];
                         Enumeration<String> reqParametre = req.getParameterNames();
+                        Enumeration<String> reqParametre2 = req.getParameterNames();
                         for (int i = 0; i < objParametre.length; i++) {
-                            int verif = 0;
-                            while (reqParametre.hasMoreElements()) {
-                                String paramName = reqParametre.nextElement();
-                                if (objParametre[i].getName().compareTo(paramName)==0) {
-                                    objValeur[i] = Reflection.castParameter(req.getParameter(paramName), objParametre[i].getParameterizedType().getTypeName());
-                                    verif++;
-                                    break;
+                            Class<?> objTemp = Reflection.getClassForName(objParametre[i].getParameterizedType().getTypeName());
+                            Object objTempInstance = null;
+                            if (!objTemp.isPrimitive()) {
+                                objTempInstance = objTemp.getDeclaredConstructor().newInstance();
+                            }
+
+                            if (!objTemp.isPrimitive() && objTempInstance.getClass().isAnnotationPresent(AnnotationObject.class)) {
+                                Field[] lesAttributs = objTempInstance.getClass().getDeclaredFields();
+                                Object[] attributsValeur = new Object[lesAttributs.length];
+                                for (int j = 0; j < lesAttributs.length; j++) {
+                                    int verif = 0;
+                                    while (reqParametre.hasMoreElements()) {
+                                        String paramName = reqParametre.nextElement();
+                                        if (paramName.startsWith(objParametre[i].getName() + ".")) {
+                                            // Obtenir la partie après le dernier "."
+                                            String lastPart = "";
+                                            int lastIndex = paramName.lastIndexOf(".");
+                                            if (lastIndex != -1 && lastIndex != paramName.length() - 1) {
+                                                lastPart = paramName.substring(lastIndex + 1);
+                                            }
+
+                                            if (lesAttributs[j].getName().compareTo(lastPart)==0) {
+                                                attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName), lesAttributs[j].getType().getName());
+                                                verif++;
+                                                break;
+                                            }
+                                            if (lesAttributs[j].isAnnotationPresent(AnnotationAttribut.class)) {
+                                                if (lesAttributs[j].getAnnotation(AnnotationAttribut.class).value().compareTo(lastPart)==0) {
+                                                    attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName), lesAttributs[j].getType().getName());
+                                                    verif++;
+                                                    break;
+                                                }
+                                            } 
+                                        }
+                                    }
+                                    if (verif == 0) {
+                                        attributsValeur[j] = Reflection.castParameter(null, lesAttributs[j].getType().getName());
+                                    }
                                 }
-                                if (objParametre[i].isAnnotationPresent(Param.class)) {
-                                    if (objParametre[i].getAnnotation(Param.class).value().compareTo(paramName)==0) {
+                                objTempInstance = Reflection.process(objTempInstance, attributsValeur);
+                                objValeur[i] = objTempInstance;
+                            }else{
+                                int verif = 0;
+                                while (reqParametre2.hasMoreElements()) {
+                                    String paramName = reqParametre2.nextElement();
+                                    if (objParametre[i].getName().compareTo(paramName)==0) {
                                         objValeur[i] = Reflection.castParameter(req.getParameter(paramName), objParametre[i].getParameterizedType().getTypeName());
                                         verif++;
                                         break;
                                     }
+                                    if (objParametre[i].isAnnotationPresent(Param.class)) {
+                                        if (objParametre[i].getAnnotation(Param.class).value().compareTo(paramName)==0) {
+                                            objValeur[i] = Reflection.castParameter(req.getParameter(paramName), objParametre[i].getParameterizedType().getTypeName());
+                                            verif++;
+                                            break;
+                                        }
+                                    }
                                 }
-                            }
-                            if (verif == 0) {
-                                objValeur[i] = Reflection.castParameter(null, objParametre[i].getParameterizedType().getTypeName());
+                                if (verif == 0) {
+                                    objValeur[i] = Reflection.castParameter(null, objParametre[i].getParameterizedType().getTypeName());
+                                }
                             }
                         }
 
