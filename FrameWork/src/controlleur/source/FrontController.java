@@ -26,7 +26,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 public class FrontController extends HttpServlet {
     private String controllerPackage;
-    private HashMap<String , Mapping> liste = new HashMap<String , Mapping>();
+    private HashMap<String, Mapping> liste = new HashMap<String, Mapping>();
     private Exception errorPackage = new Exception("null");
     private Exception errorLien = new Exception("null");
 
@@ -46,11 +46,11 @@ public class FrontController extends HttpServlet {
         this.errorPackage = errorPackage;
     }
 
-    public HashMap<String , Mapping> getListe() {
+    public HashMap<String, Mapping> getListe() {
         return liste;
     }
 
-    public void setListe(HashMap<String , Mapping> liste) {
+    public void setListe(HashMap<String, Mapping> liste) {
         this.liste = liste;
     }
 
@@ -70,18 +70,18 @@ public class FrontController extends HttpServlet {
     }
 
     public void scan(ServletContext context) {
-        HashMap<String , Mapping> boite = new HashMap<>();
+        HashMap<String, Mapping> boite = new HashMap<>();
         String packageName = this.getControllerPackage();
         try {
             String classesPath = context.getRealPath("/WEB-INF/classes");
             String decodedPath = URLDecoder.decode(classesPath, "UTF-8");
-            String packagePath = decodedPath+"/"+packageName.replace('.', '/');
+            String packagePath = decodedPath + "/" + packageName.replace('.', '/');
             File packageDirectory = new File(packagePath);
             if (packageDirectory.exists() && packageDirectory.isDirectory()) {
                 File[] classFiles = packageDirectory.listFiles((dir, name) -> name.endsWith(".class"));
                 if (classFiles != null) {
                     for (File file : classFiles) {
-                        String className = packageName+"."+file.getName().substring(0, file.getName().length()-6);
+                        String className = packageName + "." + file.getName().substring(0, file.getName().length() - 6);
                         Class<?> clazz = Class.forName(className);
                         if (isController(clazz)) {
                             Method[] listeMethod = clazz.getDeclaredMethods();
@@ -98,9 +98,8 @@ public class FrontController extends HttpServlet {
                         }
                     }
                 }
-            } 
-            else{
-                this.setErrorPackage(new Exception("Erreur Package non existant "+ packageName));
+            } else {
+                this.setErrorPackage(new Exception("Erreur Package non existant " + packageName));
             }
         } catch (Exception e) {
             this.setErrorLien(e);
@@ -112,7 +111,7 @@ public class FrontController extends HttpServlet {
         return clazz.isAnnotationPresent(AnnotationControlleur.class);
     }
 
-    private String traitement(String description,HttpServletRequest req , HttpServletResponse res)throws Exception{
+    private String traitement(String description, HttpServletRequest req, HttpServletResponse res) throws Exception {
         String url = req.getRequestURI();
         String nameProjet = req.getContextPath();
         int test = 0;
@@ -123,82 +122,97 @@ public class FrontController extends HttpServlet {
                 test++;
                 try {
                     Class<?> obj = Class.forName(value.getClassName());
-                    Object objInstance = obj.getDeclaredConstructor().newInstance(); 
+                    Object objInstance = obj.getDeclaredConstructor().newInstance();
                     if (Reflection.findParam(objInstance, value.getMethodName())) {
                         Parameter[] objParametre = Reflection.getParam(objInstance, value.getMethodName());
-                        // String[] objParametreName = Reflection.parameterNames(objInstance, value.getMethodName());
                         Object[] objValeur = new Object[objParametre.length];
                         Enumeration<String> reqParametre = req.getParameterNames();
                         Enumeration<String> reqParametre2 = req.getParameterNames();
                         for (int i = 0; i < objParametre.length; i++) {
-                            Class<?> objTemp = Reflection.getClassForName(objParametre[i].getParameterizedType().getTypeName());
+                            Class<?> objTemp = Reflection
+                                    .getClassForName(objParametre[i].getParameterizedType().getTypeName());
                             Object objTempInstance = null;
                             if (!objTemp.isPrimitive()) {
                                 objTempInstance = objTemp.getDeclaredConstructor().newInstance();
                             }
 
-                            if (!objTemp.isPrimitive() && objTempInstance.getClass().isAnnotationPresent(AnnotationObject.class)) {
-                                Field[] lesAttributs = objTempInstance.getClass().getDeclaredFields();
-                                Object[] attributsValeur = new Object[lesAttributs.length];
-                                for (int j = 0; j < lesAttributs.length; j++) {
-                                    int verif = 0;
-                                    while (reqParametre.hasMoreElements()) {
-                                        String paramName = reqParametre.nextElement();
-                                        if (paramName.startsWith(objParametre[i].getName() + ".")) {
-                                            // Obtenir la partie après le dernier "."
-                                            String lastPart = "";
-                                            int lastIndex = paramName.lastIndexOf(".");
-                                            if (lastIndex != -1 && lastIndex != paramName.length() - 1) {
-                                                lastPart = paramName.substring(lastIndex + 1);
-                                            }
+                            if (!objTemp.isPrimitive()
+                                    && objTempInstance.getClass().isAnnotationPresent(AnnotationObject.class)) {
+                                if (objParametre[i].isAnnotationPresent(Param.class)) {
+                                    Field[] lesAttributs = objTempInstance.getClass().getDeclaredFields();
+                                    Object[] attributsValeur = new Object[lesAttributs.length];
+                                    for (int j = 0; j < lesAttributs.length; j++) {
+                                        int verif = 0;
+                                        while (reqParametre.hasMoreElements()) {
+                                            String paramName = reqParametre.nextElement();
+                                            if (paramName.startsWith(
+                                                    objParametre[i].getAnnotation(Param.class).value() + ".")) {
+                                                // Obtenir la partie après le dernier "."
+                                                String lastPart = "";
+                                                int lastIndex = paramName.lastIndexOf(".");
+                                                if (lastIndex != -1 && lastIndex != paramName.length() - 1) {
+                                                    lastPart = paramName.substring(lastIndex + 1);
+                                                }
 
-                                            if (lesAttributs[j].getName().compareTo(lastPart)==0) {
-                                                attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName), lesAttributs[j].getType().getName());
-                                                verif++;
-                                                break;
-                                            }
-                                            if (lesAttributs[j].isAnnotationPresent(AnnotationAttribut.class)) {
-                                                if (lesAttributs[j].getAnnotation(AnnotationAttribut.class).value().compareTo(lastPart)==0) {
-                                                    attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName), lesAttributs[j].getType().getName());
+                                                if (lesAttributs[j].getName().compareTo(lastPart) == 0) {
+                                                    attributsValeur[j] = Reflection.castParameter(
+                                                            req.getParameter(paramName),
+                                                            lesAttributs[j].getType().getName());
                                                     verif++;
                                                     break;
                                                 }
-                                            } 
+                                                if (lesAttributs[j].isAnnotationPresent(AnnotationAttribut.class)) {
+                                                    if (lesAttributs[j].getAnnotation(AnnotationAttribut.class).value()
+                                                            .compareTo(lastPart) == 0) {
+                                                        attributsValeur[j] = Reflection.castParameter(
+                                                                req.getParameter(paramName),
+                                                                lesAttributs[j].getType().getName());
+                                                        verif++;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        if (verif == 0) {
+                                            attributsValeur[j] = Reflection.castParameter(null,
+                                                    lesAttributs[j].getType().getName());
                                         }
                                     }
-                                    if (verif == 0) {
-                                        attributsValeur[j] = Reflection.castParameter(null, lesAttributs[j].getType().getName());
-                                    }
+                                    objTempInstance = Reflection.process(objTempInstance, attributsValeur);
+                                    objValeur[i] = objTempInstance;
+                                } else {
+                                    throw new Exception("ETU002401 il n'y a pas de parametre sur cette methode");
                                 }
-                                objTempInstance = Reflection.process(objTempInstance, attributsValeur);
-                                objValeur[i] = objTempInstance;
-                            }else{
+
+                            } else {
                                 int verif = 0;
                                 while (reqParametre2.hasMoreElements()) {
                                     String paramName = reqParametre2.nextElement();
-                                    if (objParametre[i].getName().compareTo(paramName)==0) {
-                                        objValeur[i] = Reflection.castParameter(req.getParameter(paramName), objParametre[i].getParameterizedType().getTypeName());
-                                        verif++;
-                                        break;
-                                    }
                                     if (objParametre[i].isAnnotationPresent(Param.class)) {
-                                        if (objParametre[i].getAnnotation(Param.class).value().compareTo(paramName)==0) {
-                                            objValeur[i] = Reflection.castParameter(req.getParameter(paramName), objParametre[i].getParameterizedType().getTypeName());
+                                        if (objParametre[i].getAnnotation(Param.class).value()
+                                                .compareTo(paramName) == 0) {
+                                            objValeur[i] = Reflection.castParameter(req.getParameter(paramName),
+                                                    objParametre[i].getParameterizedType().getTypeName());
                                             verif++;
                                             break;
                                         }
+                                    } else {
+                                        throw new Exception("ETU002401 il n'y a pas de parametre sur cette methode");
                                     }
                                 }
                                 if (verif == 0) {
-                                    objValeur[i] = Reflection.castParameter(null, objParametre[i].getParameterizedType().getTypeName());
+                                    objValeur[i] = Reflection.castParameter(null,
+                                            objParametre[i].getParameterizedType().getTypeName());
                                 }
                             }
                         }
 
-                        String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(), objValeur);
-                        if (reponse.compareTo("controlleur.fonction.ModelView")==0) {
-                            ModelView mv = (ModelView)Reflection.execMethode(objInstance, value.getMethodName(), objValeur);
-                            String cleHash ="";
+                        String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(),
+                                objValeur);
+                        if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
+                            ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(),
+                                    objValeur);
+                            String cleHash = "";
                             Object valueHash = new Object();
                             for (String cles : mv.getData().keySet()) {
                                 cleHash = cles;
@@ -207,14 +221,14 @@ public class FrontController extends HttpServlet {
                             }
                             req.setAttribute("baseUrl", nameProjet);
                             req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
-                        }else{
+                        } else {
                             description += reponse;
                         }
-                    }else{
+                    } else {
                         String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(), null);
-                        if (reponse.compareTo("controlleur.fonction.ModelView")==0) {
-                            ModelView mv = (ModelView)Reflection.execMethode(objInstance, value.getMethodName(), null);
-                            String cleHash ="";
+                        if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
+                            ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(), null);
+                            String cleHash = "";
                             Object valueHash = new Object();
                             for (String cles : mv.getData().keySet()) {
                                 cleHash = cles;
@@ -223,36 +237,37 @@ public class FrontController extends HttpServlet {
                             }
                             req.setAttribute("baseUrl", nameProjet);
                             req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
-                        }else{
+                        } else {
                             description += reponse;
                         }
                     }
                 } catch (Exception e) {
                     throw new Exception(e.getMessage());
-                }       
+                }
             }
         }
         if (test == 0) {
-            throw new Exception("Lien inexistante : Il n'y a pas de methodes associer a cette chemin " + req.getRequestURL());
+            throw new Exception(
+                    "Lien inexistante : Il n'y a pas de methodes associer a cette chemin " + req.getRequestURL());
         }
         return description;
     }
 
-    protected void processRequest(HttpServletRequest req , HttpServletResponse res) throws ServletException , IOException {
+    protected void processRequest(HttpServletRequest req, HttpServletResponse res)
+            throws ServletException, IOException {
         PrintWriter out = res.getWriter();
-        String valiny ="";
-        if (this.getErrorPackage().getMessage().compareTo("null")==0 && this.getErrorLien().getMessage().compareTo("null")==0) {
+        String valiny = "";
+        if (this.getErrorPackage().getMessage().compareTo("null") == 0
+                && this.getErrorLien().getMessage().compareTo("null") == 0) {
             try {
                 valiny = traitement(valiny, req, res);
             } catch (Exception e) {
                 valiny = e.getMessage();
             }
-        }
-        else{
-            if (this.getErrorPackage().getMessage().compareTo("null")==0) {
+        } else {
+            if (this.getErrorPackage().getMessage().compareTo("null") == 0) {
                 valiny = this.getErrorLien().getMessage();
-            }
-            else{
+            } else {
                 valiny = this.getErrorPackage().getMessage();
             }
         }
@@ -268,5 +283,5 @@ public class FrontController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         processRequest(req, resp);
     }
-    
+
 }
