@@ -123,21 +123,30 @@ public class FrontController extends HttpServlet {
                 try {
                     Class<?> obj = Class.forName(value.getClassName());
                     Object objInstance = obj.getDeclaredConstructor().newInstance();
+                    Field[] fields = obj.getDeclaredFields();
+                    for (Field field : fields) {
+                        if (field.getType().equals(CustomeSession.class)) {
+                            CustomeSession customSession = new CustomeSession();
+                            customSession.setSession(req.getSession());
+                            field.setAccessible(true);
+                            field.set(objInstance, customSession);
+                        }
+                    }
+
                     if (Reflection.findParam(objInstance, value.getMethodName())) {
                         Parameter[] objParametre = Reflection.getParam(objInstance, value.getMethodName());
                         Object[] objValeur = new Object[objParametre.length];
                         Enumeration<String> reqParametre = req.getParameterNames();
                         Enumeration<String> reqParametre2 = req.getParameterNames();
+                        boolean isSession = false;
+                        int idParamSession = 0;
                         for (int i = 0; i < objParametre.length; i++) {
-                            Class<?> objTemp = Reflection
-                                    .getClassForName(objParametre[i].getParameterizedType().getTypeName());
+                            Class<?> objTemp = Reflection.getClassForName(objParametre[i].getParameterizedType().getTypeName());
                             Object objTempInstance = null;
                             if (!objTemp.isPrimitive()) {
                                 objTempInstance = objTemp.getDeclaredConstructor().newInstance();
                             }
-
-                            if (!objTemp.isPrimitive()
-                                    && objTempInstance.getClass().isAnnotationPresent(AnnotationObject.class)) {
+                            if (!objTemp.isPrimitive() && objTempInstance.getClass().isAnnotationPresent(AnnotationObject.class)) {
                                 if (objParametre[i].isAnnotationPresent(Param.class)) {
                                     Field[] lesAttributs = objTempInstance.getClass().getDeclaredFields();
                                     Object[] attributsValeur = new Object[lesAttributs.length];
@@ -145,9 +154,7 @@ public class FrontController extends HttpServlet {
                                         int verif = 0;
                                         while (reqParametre.hasMoreElements()) {
                                             String paramName = reqParametre.nextElement();
-                                            if (paramName.startsWith(
-                                                    objParametre[i].getAnnotation(Param.class).value() + ".")) {
-                                                // Obtenir la partie après le dernier "."
+                                            if (paramName.startsWith(objParametre[i].getAnnotation(Param.class).value() + ".")) {
                                                 String lastPart = "";
                                                 int lastIndex = paramName.lastIndexOf(".");
                                                 if (lastIndex != -1 && lastIndex != paramName.length() - 1) {
@@ -155,18 +162,13 @@ public class FrontController extends HttpServlet {
                                                 }
 
                                                 if (lesAttributs[j].getName().compareTo(lastPart) == 0) {
-                                                    attributsValeur[j] = Reflection.castParameter(
-                                                            req.getParameter(paramName),
-                                                            lesAttributs[j].getType().getName());
+                                                    attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName),lesAttributs[j].getType().getName());
                                                     verif++;
                                                     break;
                                                 }
                                                 if (lesAttributs[j].isAnnotationPresent(AnnotationAttribut.class)) {
-                                                    if (lesAttributs[j].getAnnotation(AnnotationAttribut.class).value()
-                                                            .compareTo(lastPart) == 0) {
-                                                        attributsValeur[j] = Reflection.castParameter(
-                                                                req.getParameter(paramName),
-                                                                lesAttributs[j].getType().getName());
+                                                    if (lesAttributs[j].getAnnotation(AnnotationAttribut.class).value().compareTo(lastPart) == 0) {
+                                                        attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName),lesAttributs[j].getType().getName());
                                                         verif++;
                                                         break;
                                                     }
@@ -174,8 +176,7 @@ public class FrontController extends HttpServlet {
                                             }
                                         }
                                         if (verif == 0) {
-                                            attributsValeur[j] = Reflection.castParameter(null,
-                                                    lesAttributs[j].getType().getName());
+                                            attributsValeur[j] = Reflection.castParameter(null,lesAttributs[j].getType().getName());
                                         }
                                     }
                                     objTempInstance = Reflection.process(objTempInstance, attributsValeur);
@@ -183,16 +184,19 @@ public class FrontController extends HttpServlet {
                                 } else {
                                     throw new Exception("ETU002401 il n'y a pas de parametre sur cette methode");
                                 }
-
-                            } else {
+                            } 
+                            else if (objTempInstance.getClass().getTypeName().compareTo("controlleur.source.CustomeSession") == 0) {
+                                isSession = true;
+                                idParamSession = i;
+                                objValeur[i] = Reflection.castParameter(null,objParametre[i].getParameterizedType().getTypeName());
+                            }
+                            else {
                                 int verif = 0;
                                 while (reqParametre2.hasMoreElements()) {
                                     String paramName = reqParametre2.nextElement();
                                     if (objParametre[i].isAnnotationPresent(Param.class)) {
-                                        if (objParametre[i].getAnnotation(Param.class).value()
-                                                .compareTo(paramName) == 0) {
-                                            objValeur[i] = Reflection.castParameter(req.getParameter(paramName),
-                                                    objParametre[i].getParameterizedType().getTypeName());
+                                        if (objParametre[i].getAnnotation(Param.class).value().compareTo(paramName) == 0) {
+                                            objValeur[i] = Reflection.castParameter(req.getParameter(paramName),objParametre[i].getParameterizedType().getTypeName());
                                             verif++;
                                             break;
                                         }
@@ -201,17 +205,22 @@ public class FrontController extends HttpServlet {
                                     }
                                 }
                                 if (verif == 0) {
-                                    objValeur[i] = Reflection.castParameter(null,
-                                            objParametre[i].getParameterizedType().getTypeName());
+                                    objValeur[i] = Reflection.castParameter(null,objParametre[i].getParameterizedType().getTypeName());
                                 }
                             }
                         }
 
-                        String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(),
-                                objValeur);
+                        if (isSession) {
+                            Class<?> objTemp = Reflection.getClassForName(objParametre[idParamSession].getParameterizedType().getTypeName());
+                            Object objTempInstance = objTemp.getDeclaredConstructor().newInstance();
+                            CustomeSession session = (CustomeSession)objTempInstance ;
+                            session.setSession(req.getSession());
+                            objValeur[idParamSession] = session;
+                        }
+
+                        String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(),objValeur);
                         if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
-                            ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(),
-                                    objValeur);
+                            ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(),objValeur);
                             String cleHash = "";
                             Object valueHash = new Object();
                             for (String cles : mv.getData().keySet()) {
@@ -247,18 +256,15 @@ public class FrontController extends HttpServlet {
             }
         }
         if (test == 0) {
-            throw new Exception(
-                    "Lien inexistante : Il n'y a pas de methodes associer a cette chemin " + req.getRequestURL());
+            throw new Exception("Lien inexistante : Il n'y a pas de methodes associer a cette chemin " + req.getRequestURL());
         }
         return description;
     }
 
-    protected void processRequest(HttpServletRequest req, HttpServletResponse res)
-            throws ServletException, IOException {
+    protected void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         PrintWriter out = res.getWriter();
         String valiny = "";
-        if (this.getErrorPackage().getMessage().compareTo("null") == 0
-                && this.getErrorLien().getMessage().compareTo("null") == 0) {
+        if (this.getErrorPackage().getMessage().compareTo("null") == 0 && this.getErrorLien().getMessage().compareTo("null") == 0) {
             try {
                 valiny = traitement(valiny, req, res);
             } catch (Exception e) {
