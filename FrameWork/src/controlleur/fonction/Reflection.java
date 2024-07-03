@@ -28,7 +28,9 @@ public class Reflection {
         } else {
             parameterTypes = new Class<?>[parametre.length];
             for (int i = 0; i < parametre.length; i++) {
-                if (parametre[i] instanceof Integer) {
+                if (parametre[i] == null) {
+                    parameterTypes[i] = Object.class;
+                }else if (parametre[i] instanceof Integer) {
                     parameterTypes[i] = int.class;
                 } else if (parametre[i] instanceof Double) {
                     parameterTypes[i] = double.class;
@@ -103,12 +105,12 @@ public class Reflection {
 
         for (int i = 0; i < fields.length && i < lesValeurs.length; i++) {
             Field field = fields[i];
-            field.setAccessible(true); // Pour accéder à des champs privés si nécessaire
+            field.setAccessible(true);
             Object valeur = lesValeurs[i];
             if (valeur != null) {
-                field.set(object, valeur); // Définition de la valeur de l'attribut
+                field.set(object, valeur);
             } else {
-                field.set(object, getDefaultValue(field.getType())); // Définir une valeur par défaut si null
+                field.set(object, getDefaultValue(field.getType()));
             }
         }
         return object;
@@ -203,7 +205,9 @@ public class Reflection {
         } else {
             parameterTypes = new Class<?>[parametre.length];
             for (int i = 0; i < parametre.length; i++) {
-                if (parametre[i] instanceof Integer) {
+                if (parametre[i] == null) {
+                    parameterTypes[i] = Object.class;
+                }else if (parametre[i] instanceof Integer) {
                     parameterTypes[i] = int.class;
                 } else if (parametre[i] instanceof Double) {
                     parameterTypes[i] = double.class;
