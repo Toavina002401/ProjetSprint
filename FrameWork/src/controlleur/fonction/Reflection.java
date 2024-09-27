@@ -4,6 +4,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 
+import controlleur.annotation.RestAPI;
+
 // import com.thoughtworks.paranamer.AdaptiveParanamer;
 // import com.thoughtworks.paranamer.Paranamer;
 
@@ -240,5 +242,18 @@ public class Reflection {
             } 
             return valiny;
         }
+    }
+
+    public static boolean isRestAPI(Object obj,String methodName){
+        Method[] methods = obj.getClass().getDeclaredMethods();
+        for (Method method : methods) {
+            if (method.getName().equals(methodName)) {
+                if (method.isAnnotationPresent(RestAPI.class)) {
+                    return true;
+                }
+                break;
+            }
+        }
+        return false;
     }
 }

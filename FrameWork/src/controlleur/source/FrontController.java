@@ -11,6 +11,8 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.google.gson.Gson;
+
 import controlleur.annotation.AnnotationAttribut;
 import controlleur.annotation.AnnotationControlleur;
 import controlleur.annotation.AnnotationObject;
@@ -26,6 +28,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 public class FrontController extends HttpServlet {
     private String controllerPackage;
+    private Gson gson = new Gson();
     private HashMap<String, Mapping> liste = new HashMap<String, Mapping>();
     private Exception errorPackage = new Exception("null");
     private Exception errorLien = new Exception("null");
@@ -219,35 +222,61 @@ public class FrontController extends HttpServlet {
                         }
 
                         String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(),objValeur);
-                        if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
-                            ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(),objValeur);
-                            String cleHash = "";
-                            Object valueHash = new Object();
-                            for (String cles : mv.getData().keySet()) {
-                                cleHash = cles;
-                                valueHash = mv.getData().get(cles);
-                                req.setAttribute(cleHash, valueHash);
+                        if (Reflection.isRestAPI(objInstance,  value.getMethodName())) {
+                            if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
+                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(),objValeur);
+                                String jsonResponse = gson.toJson(mv.getData());
+                                req.setAttribute("baseUrl", nameProjet);
+                                description = jsonResponse;
+                            } else {
+                                String jsonResponse = gson.toJson(reponse);
+                                description = jsonResponse;
                             }
-                            req.setAttribute("baseUrl", nameProjet);
-                            req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
-                        } else {
-                            description += reponse;
+                            res.setContentType("text/json");
+                        }else{
+                            if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
+                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(),objValeur);
+                                String cleHash = "";
+                                Object valueHash = new Object();
+                                for (String cles : mv.getData().keySet()) {
+                                    cleHash = cles;
+                                    valueHash = mv.getData().get(cles);
+                                    req.setAttribute(cleHash, valueHash);
+                                }
+                                req.setAttribute("baseUrl", nameProjet);
+                                req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
+                            } else {
+                                description += reponse;
+                            }
                         }
                     } else {
                         String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(), null);
-                        if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
-                            ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(), null);
-                            String cleHash = "";
-                            Object valueHash = new Object();
-                            for (String cles : mv.getData().keySet()) {
-                                cleHash = cles;
-                                valueHash = mv.getData().get(cles);
-                                req.setAttribute(cleHash, valueHash);
+                        if (Reflection.isRestAPI(objInstance,  value.getMethodName())) {
+                            if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
+                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(), null);
+                                String jsonResponse = gson.toJson(mv.getData());
+                                req.setAttribute("baseUrl", nameProjet);
+                                description = jsonResponse;
+                            } else {
+                                String jsonResponse = gson.toJson(reponse);
+                                description = jsonResponse;
                             }
-                            req.setAttribute("baseUrl", nameProjet);
-                            req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
-                        } else {
-                            description += reponse;
+                            res.setContentType("text/json");
+                        }else{
+                            if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
+                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(), null);
+                                String cleHash = "";
+                                Object valueHash = new Object();
+                                for (String cles : mv.getData().keySet()) {
+                                    cleHash = cles;
+                                    valueHash = mv.getData().get(cles);
+                                    req.setAttribute(cleHash, valueHash);
+                                }
+                                req.setAttribute("baseUrl", nameProjet);
+                                req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
+                            } else {
+                                description += reponse;
+                            }
                         }
                     }
                 } catch (Exception e) {
