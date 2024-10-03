@@ -16,8 +16,9 @@ import com.google.gson.Gson;
 import controlleur.annotation.AnnotationAttribut;
 import controlleur.annotation.AnnotationControlleur;
 import controlleur.annotation.AnnotationObject;
-import controlleur.annotation.Get;
 import controlleur.annotation.Param;
+import controlleur.annotation.Post;
+import controlleur.annotation.Url;
 import controlleur.fonction.ModelView;
 import controlleur.fonction.Reflection;
 import jakarta.servlet.ServletContext;
@@ -89,12 +90,19 @@ public class FrontController extends HttpServlet {
                         if (isController(clazz)) {
                             Method[] listeMethod = clazz.getDeclaredMethods();
                             for (Method method : listeMethod) {
-                                if (method.isAnnotationPresent(Get.class)) {
-                                    String key = method.getAnnotation(Get.class).value();
+                                String verbe = "GET";
+                                if (method.isAnnotationPresent(Url.class)) {
+                                    String key = method.getAnnotation(Url.class).value();
                                     if (boite.containsKey(key)) {
                                         throw new Exception("Erreur : Deux URL qui sont pareil sur cette lien " + key);
                                     }
-                                    Mapping map = new Mapping(className, method.getName());
+                                    Mapping map = new Mapping();
+                                    map.setClassName(className);
+                                    map.setMethodName( method.getName());
+                                    if (method.isAnnotationPresent(Post.class)) {
+                                        verbe = "POST";
+                                    }
+                                    map.setVerb(verbe);
                                     boite.put(key, map);
                                 }
                             }
@@ -121,9 +129,13 @@ public class FrontController extends HttpServlet {
         for (Map.Entry<String, Mapping> entry : this.getListe().entrySet()) {
             String key = nameProjet + entry.getKey();
             Mapping value = entry.getValue();
+            String verbe = req.getMethod();
             if (key.equals(url)) {
                 test++;
                 try {
+                    if (!verbe.equals(value.getVerb())) {
+                        throw new Exception("La methode "+value.getMethodName()+" est invoquee en "+value.getVerb()+" alors que ton formulaire opte pour du "+verbe+" . Un petit ajustement s'impose"); 
+                    }
                     Class<?> obj = Class.forName(value.getClassName());
                     Object objInstance = obj.getDeclaredConstructor().newInstance();
                     Field[] fields = obj.getDeclaredFields();
@@ -282,7 +294,7 @@ public class FrontController extends HttpServlet {
                 } catch (Exception e) {
                     throw new Exception(e.getMessage());
                 }
-            }
+            }               
         }
         if (test == 0) {
             throw new Exception("Lien inexistante : Il n'y a pas de methodes associer a cette chemin " + req.getRequestURL());
