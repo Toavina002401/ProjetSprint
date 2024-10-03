@@ -3,12 +3,14 @@ package controlleur.source;
 public class Mapping {
     String className;
     String methodName;
+    String verb;//Soit 'GET' ou 'POST' en majuscule
 
     public Mapping(){}
 
-    public Mapping(String className, String methodName) {
+    public Mapping(String className, String methodName, String verb) {
         this.setClassName(className);
         this.setMethodName(methodName);
+        this.setVerb(verb);
     }
 
     public String getMethodName() {
@@ -26,4 +28,12 @@ public class Mapping {
     public void setClassName(String className) {
         this.className = className;
     }    
+
+    public String getVerb() {
+        return verb;
+    }
+
+    public void setVerb(String verb) {
+        this.verb = verb;
+    }
 }
