@@ -90,20 +90,26 @@ public class FrontController extends HttpServlet {
                         if (isController(clazz)) {
                             Method[] listeMethod = clazz.getDeclaredMethods();
                             for (Method method : listeMethod) {
+                                Mapping map = new Mapping();
+                                map.setClassName(className);
                                 String verbe = "GET";
                                 if (method.isAnnotationPresent(Url.class)) {
                                     String key = method.getAnnotation(Url.class).value();
-                                    if (boite.containsKey(key)) {
-                                        throw new Exception("Erreur : Deux URL qui sont pareil sur cette lien " + key);
-                                    }
-                                    Mapping map = new Mapping();
-                                    map.setClassName(className);
-                                    map.setMethodName( method.getName());
                                     if (method.isAnnotationPresent(Post.class)) {
                                         verbe = "POST";
                                     }
-                                    map.setVerb(verbe);
-                                    boite.put(key, map);
+                                    VerbAction verbeAction = new VerbAction(method.getName(),verbe);
+                                    if (boite.containsKey(key)) {
+                                        Mapping keyExist = boite.get(key);
+                                        if (keyExist.contains(verbeAction)) {
+                                            throw new Exception("Erreur : Deux URL qui sont pareil sur cette lien " + key+" avec le meme verbe "+ verbe);
+                                        }
+                                        keyExist.addVerbAction(verbeAction);
+                                    }
+                                    else{
+                                        map.addVerbAction(verbeAction);
+                                        boite.put(key, map);
+                                    }                                    
                                 }
                             }
                         }
@@ -131,10 +137,16 @@ public class FrontController extends HttpServlet {
             Mapping value = entry.getValue();
             String verbe = req.getMethod();
             if (key.equals(url)) {
+                int idVerbeMethode = 0;
+                for (int i=0 ;i<value.getVerbeAction().size();i++) {
+                    if (value.getVerbeAction().get(i).getVerb().equals(verbe)) {
+                        idVerbeMethode = i;
+                    }
+                }
                 test++;
                 try {
-                    if (!verbe.equals(value.getVerb())) {
-                        throw new Exception("La methode "+value.getMethodName()+" est invoquee en "+value.getVerb()+" alors que ton formulaire opte pour du "+verbe+" . Un petit ajustement s'impose"); 
+                    if (!verbe.equals(value.getVerbeAction().get(idVerbeMethode).getVerb())) {
+                        throw new Exception("La methode "+value.getVerbeAction().get(idVerbeMethode).getMethodName()+" est invoquee en "+value.getVerbeAction().get(idVerbeMethode).getVerb()+" alors que ton formulaire opte pour du "+verbe+" . Un petit ajustement s'impose"); 
                     }
                     Class<?> obj = Class.forName(value.getClassName());
                     Object objInstance = obj.getDeclaredConstructor().newInstance();
@@ -148,8 +160,8 @@ public class FrontController extends HttpServlet {
                         }
                     }
 
-                    if (Reflection.findParam(objInstance, value.getMethodName())) {
-                        Parameter[] objParametre = Reflection.getParam(objInstance, value.getMethodName());
+                    if (Reflection.findParam(objInstance, value.getVerbeAction().get(idVerbeMethode).getMethodName())) {
+                        Parameter[] objParametre = Reflection.getParam(objInstance, value.getVerbeAction().get(idVerbeMethode).getMethodName());
                         Object[] objValeur = new Object[objParametre.length];
                         Enumeration<String> reqParametre = req.getParameterNames();
                         Enumeration<String> reqParametre2 = req.getParameterNames();
@@ -233,10 +245,10 @@ public class FrontController extends HttpServlet {
                             objValeur[idParamSession] = session;
                         }
 
-                        String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(),objValeur);
-                        if (Reflection.isRestAPI(objInstance,  value.getMethodName())) {
+                        String reponse = Reflection.execMethodeController(objInstance, value.getVerbeAction().get(idVerbeMethode).getMethodName(),objValeur);
+                        if (Reflection.isRestAPI(objInstance,  value.getVerbeAction().get(idVerbeMethode).getMethodName())) {
                             if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
-                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(),objValeur);
+                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getVerbeAction().get(idVerbeMethode).getMethodName(),objValeur);
                                 String jsonResponse = gson.toJson(mv.getData());
                                 req.setAttribute("baseUrl", nameProjet);
                                 description = jsonResponse;
@@ -247,7 +259,7 @@ public class FrontController extends HttpServlet {
                             res.setContentType("text/json");
                         }else{
                             if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
-                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(),objValeur);
+                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getVerbeAction().get(idVerbeMethode).getMethodName(),objValeur);
                                 String cleHash = "";
                                 Object valueHash = new Object();
                                 for (String cles : mv.getData().keySet()) {
@@ -262,10 +274,10 @@ public class FrontController extends HttpServlet {
                             }
                         }
                     } else {
-                        String reponse = Reflection.execMethodeController(objInstance, value.getMethodName(), null);
-                        if (Reflection.isRestAPI(objInstance,  value.getMethodName())) {
+                        String reponse = Reflection.execMethodeController(objInstance, value.getVerbeAction().get(idVerbeMethode).getMethodName(), null);
+                        if (Reflection.isRestAPI(objInstance,  value.getVerbeAction().get(idVerbeMethode).getMethodName())) {
                             if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
-                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(), null);
+                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getVerbeAction().get(idVerbeMethode).getMethodName(), null);
                                 String jsonResponse = gson.toJson(mv.getData());
                                 req.setAttribute("baseUrl", nameProjet);
                                 description = jsonResponse;
@@ -276,7 +288,7 @@ public class FrontController extends HttpServlet {
                             res.setContentType("text/json");
                         }else{
                             if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
-                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getMethodName(), null);
+                                ModelView mv = (ModelView) Reflection.execMethode(objInstance, value.getVerbeAction().get(idVerbeMethode).getMethodName(), null);
                                 String cleHash = "";
                                 Object valueHash = new Object();
                                 for (String cles : mv.getData().keySet()) {
