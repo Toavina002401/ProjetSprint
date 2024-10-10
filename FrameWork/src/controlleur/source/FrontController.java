@@ -33,6 +33,15 @@ public class FrontController extends HttpServlet {
     private HashMap<String, Mapping> liste = new HashMap<String, Mapping>();
     private Exception errorPackage = new Exception("null");
     private Exception errorLien = new Exception("null");
+    private String statusCode = "200";
+
+    public void setStatusCode(String statusCode) {
+        this.statusCode = statusCode;
+    }
+
+    public String getStatusCode() {
+        return statusCode;
+    }
 
     public Exception getErrorLien() {
         return errorLien;
@@ -102,6 +111,7 @@ public class FrontController extends HttpServlet {
                                     if (boite.containsKey(key)) {
                                         Mapping keyExist = boite.get(key);
                                         if (keyExist.contains(verbeAction)) {
+                                            this.setStatusCode("409");
                                             throw new Exception("Erreur : Deux URL qui sont pareil sur cette lien " + key+" avec le meme verbe "+ verbe);
                                         }
                                         keyExist.addVerbAction(verbeAction);
@@ -116,6 +126,7 @@ public class FrontController extends HttpServlet {
                     }
                 }
             } else {
+                this.setStatusCode("500");
                 this.setErrorPackage(new Exception("Erreur Package non existant " + packageName));
             }
         } catch (Exception e) {
@@ -146,6 +157,7 @@ public class FrontController extends HttpServlet {
                 test++;
                 try {
                     if (!verbe.equals(value.getVerbeAction().get(idVerbeMethode).getVerb())) {
+                        this.setStatusCode("405");
                         throw new Exception("La methode "+value.getVerbeAction().get(idVerbeMethode).getMethodName()+" est invoquee en "+value.getVerbeAction().get(idVerbeMethode).getVerb()+" alors que ton formulaire opte pour du "+verbe+" . Un petit ajustement s'impose"); 
                     }
                     Class<?> obj = Class.forName(value.getClassName());
@@ -209,6 +221,7 @@ public class FrontController extends HttpServlet {
                                     objTempInstance = Reflection.process(objTempInstance, attributsValeur);
                                     objValeur[i] = objTempInstance;
                                 } else {
+                                    this.setStatusCode("400");
                                     throw new Exception("ETU002401 il n'y a pas de parametre sur cette methode");
                                 }
                             } 
@@ -228,6 +241,7 @@ public class FrontController extends HttpServlet {
                                             break;
                                         }
                                     } else {
+                                        this.setStatusCode("400");
                                         throw new Exception("ETU002401 il n'y a pas de parametre sur cette methode");
                                     }
                                 }
@@ -309,6 +323,7 @@ public class FrontController extends HttpServlet {
             }               
         }
         if (test == 0) {
+            this.setStatusCode("404");
             throw new Exception("Lien inexistante : Il n'y a pas de methodes associer a cette chemin " + req.getRequestURL());
         }
         return description;
@@ -322,12 +337,15 @@ public class FrontController extends HttpServlet {
                 valiny = traitement(valiny, req, res);
             } catch (Exception e) {
                 valiny = e.getMessage();
+                res.sendError(Integer.parseInt(this.getStatusCode()), valiny);
             }
         } else {
             if (this.getErrorPackage().getMessage().compareTo("null") == 0) {
                 valiny = this.getErrorLien().getMessage();
+                res.sendError(Integer.parseInt(this.getStatusCode()), valiny);
             } else {
                 valiny = this.getErrorPackage().getMessage();
+                res.sendError(Integer.parseInt(this.getStatusCode()), valiny);
             }
         }
         out.println(valiny);
