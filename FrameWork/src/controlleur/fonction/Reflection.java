@@ -1,10 +1,15 @@
 package controlleur.fonction;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 
 import controlleur.annotation.RestAPI;
+import jakarta.servlet.http.Part;
 
 // import com.thoughtworks.paranamer.AdaptiveParanamer;
 // import com.thoughtworks.paranamer.Paranamer;
@@ -46,6 +51,8 @@ public class Reflection {
                     parameterTypes[i] = short.class;
                 } else if (parametre[i] instanceof Byte) {
                     parameterTypes[i] = byte.class;
+                } else if (parametre[i].getClass().getName().equals("org.apache.catalina.core.ApplicationPart")) {
+                    parameterTypes[i] = jakarta.servlet.http.Part.class;
                 } else {
                     parameterTypes[i] = parametre[i].getClass();
                 }
@@ -200,6 +207,35 @@ public class Reflection {
         }
     }
 
+    public static Object getPartValue(Part part, Class<?> targetType) throws IOException, ParseException {
+        String value = new String(part.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+
+        // Traitez la valeur en fonction du type cible
+        if (targetType == String.class) {
+            return value; // Retourne directement la chaîne
+        } else if (targetType == Integer.class || targetType == int.class) {
+            return Integer.parseInt(value); // Convertit en entier
+        } else if (targetType == Double.class || targetType == double.class) {
+            return Double.parseDouble(value); // Convertit en double
+        } else if (targetType == Boolean.class || targetType == boolean.class) {
+            return Boolean.parseBoolean(value); // Convertit en booléen
+        } else if (targetType == Long.class || targetType == long.class) {
+            return Long.parseLong(value); // Convertit en long
+        } else if (targetType == Float.class || targetType == float.class) {
+            return Float.parseFloat(value); // Convertit en float
+        } else if (targetType == Short.class || targetType == short.class) {
+            return Short.parseShort(value); // Convertit en short
+        } else if (targetType == Byte.class || targetType == byte.class) {
+            return Byte.parseByte(value); // Convertit en byte
+        } else if (targetType == java.util.Date.class) {
+            // Si c'est une date, utilisez un format spécifique
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd"); // Ajustez le format selon vos besoins
+            return sdf.parse(value); // Convertit en Date
+        } else {
+            throw new IllegalArgumentException("Type non supporté: " + targetType.getName());
+        }
+    }
+
     public static String execMethodeController(Object obj, String methodeName, Object[] parametre) throws Exception {
         Class<?>[] parameterTypes;
         if (parametre == null) {
@@ -209,7 +245,7 @@ public class Reflection {
             for (int i = 0; i < parametre.length; i++) {
                 if (parametre[i] == null) {
                     parameterTypes[i] = Object.class;
-                }else if (parametre[i] instanceof Integer) {
+                } else if (parametre[i] instanceof Integer) {
                     parameterTypes[i] = int.class;
                 } else if (parametre[i] instanceof Double) {
                     parameterTypes[i] = double.class;
@@ -223,6 +259,8 @@ public class Reflection {
                     parameterTypes[i] = short.class;
                 } else if (parametre[i] instanceof Byte) {
                     parameterTypes[i] = byte.class;
+                } else if (parametre[i].getClass().getName().equals("org.apache.catalina.core.ApplicationPart")) {
+                    parameterTypes[i] = jakarta.servlet.http.Part.class;
                 } else {
                     parameterTypes[i] = parametre[i].getClass();
                 }
@@ -234,15 +272,15 @@ public class Reflection {
             return (String) result;
         } else {
             String valiny = "";
-            if (result.getClass().getTypeName().compareTo("controlleur.fonction.ModelView")==0) {
+            if (result.getClass().getTypeName().compareTo("controlleur.fonction.ModelView") == 0) {
                 valiny = result.getClass().getTypeName();
+            } else {
+                throw new Exception("Erreur: Type de retour inconnu. La méthode doit retourner une String ou une ModelView.");
             }
-            else{
-                throw new Exception("Erreur: Type de retour que l'on connait pas. La methode droit etre une String ou une ModelView ");
-            } 
             return valiny;
         }
     }
+
 
     public static boolean isRestAPI(Object obj,String methodName){
         Method[] methods = obj.getClass().getDeclaredMethods();
@@ -256,4 +294,5 @@ public class Reflection {
         }
         return false;
     }
+
 }
