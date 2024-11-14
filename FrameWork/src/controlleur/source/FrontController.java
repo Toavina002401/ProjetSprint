@@ -202,8 +202,7 @@ public class FrontController extends HttpServlet {
                                 if (!objTemp.isPrimitive()) {
                                     objTempInstance = objTemp.getDeclaredConstructor().newInstance();
                                 }
-                                if (!objTemp.isPrimitive()
-                                        && objTempInstance.getClass().isAnnotationPresent(AnnotationObject.class)) {
+                                if (!objTemp.isPrimitive() && objTempInstance.getClass().isAnnotationPresent(AnnotationObject.class)) {
                                     if (objParametre[i].isAnnotationPresent(Param.class)) {
                                         Field[] lesAttributs = objTempInstance.getClass().getDeclaredFields();
                                         Object[] attributsValeur = new Object[lesAttributs.length];
@@ -211,30 +210,35 @@ public class FrontController extends HttpServlet {
                                             int verif = 0;
                                             while (reqParametre.hasMoreElements()) {
                                                 String paramName = reqParametre.nextElement();
-                                                if (paramName.startsWith(objParametre[i].getAnnotation(Param.class).value() + ".")) {
-                                                    String lastPart = "";
-                                                    int lastIndex = paramName.lastIndexOf(".");
-                                                    if (lastIndex != -1 && lastIndex != paramName.length() - 1) {
-                                                        lastPart = paramName.substring(lastIndex + 1);
-                                                    }
 
-                                                    if (lesAttributs[j].getName().compareTo(lastPart) == 0) {
-                                                        attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName),lesAttributs[j].getType().getName());
-                                                        verif++;
-                                                        break;
-                                                    }
-                                                    if (lesAttributs[j].isAnnotationPresent(AnnotationAttribut.class)) {
-                                                        if (lesAttributs[j].getAnnotation(AnnotationAttribut.class).value().compareTo(lastPart) == 0) {
+                                                if (!Reflection.validation(lesAttributs[j], req.getParameter(paramName))) {
+                                                    this.setStatusCode("401");
+                                                    throw new Exception("Erreur du validation :"+Reflection.erreurValidation(lesAttributs[j], req.getParameter(paramName)));
+                                                }else{
+                                                    if (paramName.startsWith(objParametre[i].getAnnotation(Param.class).value() + ".")) {
+                                                        String lastPart = "";
+                                                        int lastIndex = paramName.lastIndexOf(".");
+                                                        if (lastIndex != -1 && lastIndex != paramName.length() - 1) {
+                                                            lastPart = paramName.substring(lastIndex + 1);
+                                                        }
+
+                                                        if (lesAttributs[j].getName().compareTo(lastPart) == 0) {
                                                             attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName),lesAttributs[j].getType().getName());
                                                             verif++;
                                                             break;
+                                                        }
+                                                        if (lesAttributs[j].isAnnotationPresent(AnnotationAttribut.class)) {
+                                                            if (lesAttributs[j].getAnnotation(AnnotationAttribut.class).value().compareTo(lastPart) == 0) {
+                                                                attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName),lesAttributs[j].getType().getName());
+                                                                verif++;
+                                                                break;
+                                                            }
                                                         }
                                                     }
                                                 }
                                             }
                                             if (verif == 0) {
-                                                attributsValeur[j] = Reflection.castParameter(null,
-                                                        lesAttributs[j].getType().getName());
+                                                attributsValeur[j] = Reflection.castParameter(null,lesAttributs[j].getType().getName());
                                             }
                                         }
                                         objTempInstance = Reflection.process(objTempInstance, attributsValeur);
