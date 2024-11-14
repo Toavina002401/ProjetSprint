@@ -7,7 +7,11 @@ import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.regex.Pattern;
 
+import controlleur.annotation.Email;
+import controlleur.annotation.Range;
+import controlleur.annotation.Required;
 import controlleur.annotation.RestAPI;
 import jakarta.servlet.http.Part;
 
@@ -293,6 +297,68 @@ public class Reflection {
             }
         }
         return false;
+    }
+
+
+    public static boolean validation(Field attributs, String valeur) {
+        boolean valiny = true;
+
+        if (attributs.isAnnotationPresent(Required.class)) {
+            if (valeur == null || valeur.trim().isEmpty()) {
+                return false;
+            }
+        }
+
+        if (attributs.isAnnotationPresent(Email.class)) {
+            String emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
+            Pattern pattern = Pattern.compile(emailRegex);
+            if (!pattern.matcher(valeur).matches()) {
+                return false;
+            }
+        }
+
+        if (attributs.isAnnotationPresent(Range.class)) {
+            try {
+                double valeurNumerique = Double.parseDouble(valeur);
+                Range range = attributs.getAnnotation(Range.class);
+                if (valeurNumerique < range.min() || valeurNumerique > range.max()) {
+                    return false; 
+                }
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        } 
+        return valiny;
+    }
+
+    public static String erreurValidation(Field attributs, String valeur) {
+        String valiny = "";
+        if (attributs.isAnnotationPresent(Required.class)) {
+            if (valeur == null || valeur.trim().isEmpty()) {
+                valiny = "La valeur est obligatoire, donc ne doit pas être null ou vide sur cette champ "+attributs.getName();
+                return valiny;
+            }
+        }
+        if (attributs.isAnnotationPresent(Email.class)) {
+            String emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
+            Pattern pattern = Pattern.compile(emailRegex);
+            if (!pattern.matcher(valeur).matches()) {
+                return "La valeur doit correspondre au format email sur cette champ "+attributs.getName();
+            }
+        }
+        if (attributs.isAnnotationPresent(Range.class)) {
+            try {
+                double valeurNumerique = Double.parseDouble(valeur);
+                Range range = attributs.getAnnotation(Range.class);
+                if (valeurNumerique < range.min() || valeurNumerique > range.max()) {
+                    valiny = "La valeur doit être entre min:"+range.min()+" et max:"+range.max()+" pour cette champ "+attributs.getName();
+                    return valiny;
+                }
+            } catch (NumberFormatException e) {
+                return "La valeur doit être un nombre si @Range est présent sur cette champ "+attributs.getName();
+            }
+        } 
+        return valiny;
     }
 
 }
