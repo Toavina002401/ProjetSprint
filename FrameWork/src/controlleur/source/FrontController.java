@@ -7,8 +7,10 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URLDecoder;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.google.gson.Gson;
@@ -150,6 +152,8 @@ public class FrontController extends HttpServlet {
             String key = nameProjet + entry.getKey();
             Mapping value = entry.getValue();
             String verbe = req.getMethod();
+            int verifErreur = 0;
+            HashMap<String, List<String>> mapErreur = new HashMap<String, List<String>>();
             if (key.equals(url)) {
                 int idVerbeMethode = 0;
                 for (int i = 0; i < value.getVerbeAction().size(); i++) {
@@ -183,6 +187,12 @@ public class FrontController extends HttpServlet {
                         Object[] objValeur = new Object[objParametre.length];
                         Enumeration<String> reqParametre = req.getParameterNames();
                         Enumeration<String> reqParametre2 = req.getParameterNames();
+                        List<String> reqParametreString = new ArrayList<String>();
+                        while (reqParametre.hasMoreElements()) {
+                            String paramName = reqParametre.nextElement();
+                            reqParametreString.add(paramName);
+                        }
+
                         boolean isSession = false;
                         int idParamSession = 0;
                         for (int i = 0; i < objParametre.length; i++) {
@@ -206,29 +216,43 @@ public class FrontController extends HttpServlet {
                                     if (objParametre[i].isAnnotationPresent(Param.class)) {
                                         Field[] lesAttributs = objTempInstance.getClass().getDeclaredFields();
                                         Object[] attributsValeur = new Object[lesAttributs.length];
+
                                         for (int j = 0; j < lesAttributs.length; j++) {
                                             int verif = 0;
-                                            while (reqParametre.hasMoreElements()) {
-                                                String paramName = reqParametre.nextElement();
 
-                                                if (!Reflection.validation(lesAttributs[j], req.getParameter(paramName))) {
-                                                    this.setStatusCode("401");
-                                                    throw new Exception("Erreur du validation :"+Reflection.erreurValidation(lesAttributs[j], req.getParameter(paramName)));
-                                                }else{
-                                                    if (paramName.startsWith(objParametre[i].getAnnotation(Param.class).value() + ".")) {
-                                                        String lastPart = "";
-                                                        int lastIndex = paramName.lastIndexOf(".");
-                                                        if (lastIndex != -1 && lastIndex != paramName.length() - 1) {
-                                                            lastPart = paramName.substring(lastIndex + 1);
-                                                        }
+                                            List<String> valeurErreur = new ArrayList<>();
+                                            String clesErreur = "error_"+objParametre[i].getAnnotation(Param.class).value() + ".";
+                                            if (lesAttributs[j].isAnnotationPresent(AnnotationAttribut.class)) {
+                                                clesErreur += lesAttributs[j].getAnnotation(AnnotationAttribut.class).value();
+                                            }else {
+                                                clesErreur += lesAttributs[j].getName();
+                                            }
 
-                                                        if (lesAttributs[j].getName().compareTo(lastPart) == 0) {
+                                            for (int k = 0; k < reqParametreString.size(); k++) {
+                                                String paramName = reqParametreString.get(k);
+                                                if (paramName.startsWith(objParametre[i].getAnnotation(Param.class).value() + ".")) {
+                                                    String lastPart = "";
+                                                    int lastIndex = paramName.lastIndexOf(".");
+                                                    if (lastIndex != -1 && lastIndex != paramName.length() - 1) {
+                                                        lastPart = paramName.substring(lastIndex + 1);
+                                                    }
+
+                                                    if (lesAttributs[j].getName().compareTo(lastPart) == 0) {
+                                                        if (!Reflection.validation(lesAttributs[j], req.getParameter(paramName))) {
+                                                            valeurErreur = Reflection.erreurValidation(lesAttributs[j], req.getParameter(paramName));
+                                                            verifErreur ++;
+                                                        }else{
                                                             attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName),lesAttributs[j].getType().getName());
                                                             verif++;
                                                             break;
                                                         }
-                                                        if (lesAttributs[j].isAnnotationPresent(AnnotationAttribut.class)) {
-                                                            if (lesAttributs[j].getAnnotation(AnnotationAttribut.class).value().compareTo(lastPart) == 0) {
+                                                    }
+                                                    if (lesAttributs[j].isAnnotationPresent(AnnotationAttribut.class)) {
+                                                        if (lesAttributs[j].getAnnotation(AnnotationAttribut.class).value().compareTo(lastPart) == 0) {
+                                                            if (!Reflection.validation(lesAttributs[j], req.getParameter(paramName))) {
+                                                                valeurErreur = Reflection.erreurValidation(lesAttributs[j], req.getParameter(paramName));
+                                                                verifErreur ++;
+                                                            }else{
                                                                 attributsValeur[j] = Reflection.castParameter(req.getParameter(paramName),lesAttributs[j].getType().getName());
                                                                 verif++;
                                                                 break;
@@ -236,11 +260,16 @@ public class FrontController extends HttpServlet {
                                                         }
                                                     }
                                                 }
+                                                
                                             }
+                                            
                                             if (verif == 0) {
                                                 attributsValeur[j] = Reflection.castParameter(null,lesAttributs[j].getType().getName());
                                             }
+
+                                            mapErreur.put(clesErreur, valeurErreur);
                                         }
+
                                         objTempInstance = Reflection.process(objTempInstance, attributsValeur);
                                         objValeur[i] = objTempInstance;
                                     } else {
@@ -299,14 +328,40 @@ public class FrontController extends HttpServlet {
                             if (reponse.compareTo("controlleur.fonction.ModelView") == 0) {
                                 ModelView mv = (ModelView) Reflection.execMethode(objInstance,value.getVerbeAction().get(idVerbeMethode).getMethodName(), objValeur);
                                 String cleHash = "";
+                                String referer = "";
                                 Object valueHash = new Object();
                                 for (String cles : mv.getData().keySet()) {
                                     cleHash = cles;
                                     valueHash = mv.getData().get(cles);
-                                    req.setAttribute(cleHash, valueHash);
+                                    if (cleHash.equals("referer")) {
+                                        referer = (String)mv.getData().get(cleHash);
+                                    }else{
+                                        req.setAttribute(cleHash, valueHash);
+                                    }
                                 }
                                 req.setAttribute("baseUrl", nameProjet);
-                                req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
+                                if (verifErreur != 0) {
+                                    for (int j = 0; j < reqParametreString.size(); j++) {     
+                                        String paramName = reqParametreString.get(j);
+                                        req.setAttribute(paramName,req.getParameter(paramName));
+                                    }
+
+                                    if (referer != null && !referer.isEmpty()) {
+                                        req.setAttribute("baseUrl", nameProjet);
+
+                                        for (Map.Entry<String, List<String>> entree : mapErreur.entrySet()) {
+                                            String cle = entree.getKey();
+                                            List<String> valeur = entree.getValue();
+                                            req.setAttribute(cle, valeur);
+                                        }
+                                        req.getServletContext().getRequestDispatcher(referer).forward(req, res);
+                                    } else {
+                                        this.setStatusCode("405");
+                                        throw new Exception("Erreur : Aucun referer trouvé dans la requête.");
+                                    }
+                                }else{
+                                    req.getServletContext().getRequestDispatcher(mv.getUrl()).forward(req, res);
+                                }
                             } else {
                                 description += reponse;
                             }

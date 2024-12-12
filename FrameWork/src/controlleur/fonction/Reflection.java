@@ -7,6 +7,8 @@ import java.lang.reflect.Parameter;
 import java.nio.charset.StandardCharsets;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import controlleur.annotation.Email;
@@ -331,19 +333,20 @@ public class Reflection {
         return valiny;
     }
 
-    public static String erreurValidation(Field attributs, String valeur) {
-        String valiny = "";
+    public static List<String> erreurValidation(Field attributs, String valeur) {
+        List<String> valiny = new ArrayList<String>();
         if (attributs.isAnnotationPresent(Required.class)) {
             if (valeur == null || valeur.trim().isEmpty()) {
-                valiny = "La valeur est obligatoire, donc ne doit pas être null ou vide sur cette champ "+attributs.getName();
-                return valiny;
+                String temp = "La valeur est obligatoire, donc ne doit pas être null ou vide sur cette champ "+attributs.getName();
+                valiny.add(temp);
             }
         }
         if (attributs.isAnnotationPresent(Email.class)) {
             String emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
             Pattern pattern = Pattern.compile(emailRegex);
             if (!pattern.matcher(valeur).matches()) {
-                return "La valeur doit correspondre au format email sur cette champ "+attributs.getName();
+                String temp = "La valeur doit correspondre au format email sur cette champ "+attributs.getName();
+                valiny.add(temp);
             }
         }
         if (attributs.isAnnotationPresent(Range.class)) {
@@ -351,11 +354,12 @@ public class Reflection {
                 double valeurNumerique = Double.parseDouble(valeur);
                 Range range = attributs.getAnnotation(Range.class);
                 if (valeurNumerique < range.min() || valeurNumerique > range.max()) {
-                    valiny = "La valeur doit être entre min:"+range.min()+" et max:"+range.max()+" pour cette champ "+attributs.getName();
-                    return valiny;
+                    String temp = "La valeur doit être entre min:"+range.min()+" et max:"+range.max()+" pour cette champ "+attributs.getName();
+                    valiny.add(temp);
                 }
             } catch (NumberFormatException e) {
-                return "La valeur doit être un nombre si @Range est présent sur cette champ "+attributs.getName();
+                String temp = "La valeur doit être un nombre si @Range est présent sur cette champ "+attributs.getName();
+                valiny.add(temp);
             }
         } 
         return valiny;
