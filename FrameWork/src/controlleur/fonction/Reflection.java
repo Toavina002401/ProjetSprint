@@ -365,4 +365,15 @@ public class Reflection {
         return valiny;
     }
 
+    public static Method getMethode(Object obj , String methodName)  throws Exception {
+        Method[] methods = obj.getClass().getDeclaredMethods();
+        Method valiny = null;
+        for (Method method : methods) {
+            if (method.getName().equals(methodName)) {
+                valiny = method;
+            }
+        }
+        return valiny;
+    }
+
 }

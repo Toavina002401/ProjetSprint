@@ -18,8 +18,10 @@ import com.google.gson.Gson;
 import controlleur.annotation.AnnotationAttribut;
 import controlleur.annotation.AnnotationControlleur;
 import controlleur.annotation.AnnotationObject;
+import controlleur.annotation.Auth;
 import controlleur.annotation.Param;
 import controlleur.annotation.Post;
+import controlleur.annotation.Roles;
 import controlleur.annotation.Url;
 import controlleur.fonction.ModelView;
 import controlleur.fonction.Reflection;
@@ -39,6 +41,24 @@ public class FrontController extends HttpServlet {
     private Exception errorPackage = new Exception("null");
     private Exception errorLien = new Exception("null");
     private String statusCode = "200";
+    private String authUser;
+    private String userRoles;
+
+    public String getAuthUser() {
+        return authUser;
+    }
+
+    public void setAuthUser(String authUser) {
+        this.authUser = authUser;
+    }
+
+    public String getUserRoles() {
+        return userRoles;
+    }
+
+    public void setUserRoles(String userRoles) {
+        this.userRoles = userRoles;
+    }
 
     public void setStatusCode(String statusCode) {
         this.statusCode = statusCode;
@@ -75,6 +95,8 @@ public class FrontController extends HttpServlet {
     @Override
     public void init() throws ServletException {
         this.setControllerPackage(getServletConfig().getInitParameter("namePath"));
+        this.setAuthUser(getServletContext().getInitParameter("authentification"));
+        this.setUserRoles(getServletContext().getInitParameter("roles"));
         this.scan(getServletContext());
         super.init();
     }
@@ -117,8 +139,7 @@ public class FrontController extends HttpServlet {
                                         Mapping keyExist = boite.get(key);
                                         if (keyExist.contains(verbeAction)) {
                                             this.setStatusCode("409");
-                                            throw new Exception("Erreur : Deux URL qui sont pareil sur cette lien "
-                                                    + key + " avec le meme verbe " + verbe);
+                                            throw new Exception("Erreur : Deux URL qui sont pareil sur cette lien "+ key + " avec le meme verbe " + verbe);
                                         }
                                         keyExist.addVerbAction(verbeAction);
                                     } else {
@@ -144,6 +165,56 @@ public class FrontController extends HttpServlet {
         return clazz.isAnnotationPresent(AnnotationControlleur.class);
     }
 
+    private void traitementAuth(Method meth , Class<?> clazz,HttpServletRequest req) throws Exception{
+        CustomeSession session = new CustomeSession();
+        session.setSession(req.getSession());
+        if (meth != null && clazz == null) {
+            if (meth.isAnnotationPresent(Auth.class)) {
+                if ((Boolean)session.getSession().getAttribute(getAuthUser()) != true) {
+                    this.setStatusCode("400");
+                    throw new Exception("Vous ne pouvez pas accéder à cette méthode car vous devez être authentifié"); 
+                }
+            }else if (meth.isAnnotationPresent(Roles.class)) {
+                String[] lesRoles =  meth.getAnnotation(Roles.class).value();
+                boolean exists = true;
+                String mess = String.join(" ou ", lesRoles);
+                for (String ext : lesRoles) {
+                    if (ext.equals((String)session.getSession().getAttribute(getUserRoles()))) {
+                        exists = false;                
+                    }
+                }
+                if (exists) {
+                    this.setStatusCode("400");
+                    throw new Exception("Vous ne pouvez pas accéder à cette méthode car vous devez être une "+mess);                    
+                }
+            }else{
+                //Pour les methodes publics et qui n'ont pas d'annotations
+            }
+        }else if(meth == null && clazz != null){
+            if (clazz.isAnnotationPresent(Auth.class)) {
+                if ((Boolean)session.getSession().getAttribute(authUser) != true) {
+                    this.setStatusCode("400");
+                    throw new Exception("Vous ne pouvez pas accéder à cette controlleur car vous devez être authentifié"); 
+                }
+            }else if (clazz.isAnnotationPresent(Roles.class)) {
+                String[] lesRoles =  clazz.getAnnotation(Roles.class).value();
+                boolean exists = true;
+                String mess = String.join(" ou ", lesRoles);
+                for (String ext : lesRoles) {
+                    if (ext.equals((String)session.getSession().getAttribute(getUserRoles()))) {
+                        exists = false;                
+                    }
+                }
+                if (exists) {
+                    this.setStatusCode("400");
+                    throw new Exception("Vous ne pouvez pas accéder à cette controlleur car vous devez être une "+mess);
+                }
+            }else{
+                //Pour les controlleur publics et qui n'ont pas d'annotations
+            }
+        }
+    }
+
     private String traitement(String description, HttpServletRequest req, HttpServletResponse res) throws Exception {
         String url = req.getRequestURI();
         String nameProjet = req.getContextPath();
@@ -161,7 +232,9 @@ public class FrontController extends HttpServlet {
                         idVerbeMethode = i;
                     }
                 }
+                
                 test++;
+
                 try {
                     if (!verbe.equals(value.getVerbeAction().get(idVerbeMethode).getVerb())) {
                         this.setStatusCode("405");
@@ -170,7 +243,9 @@ public class FrontController extends HttpServlet {
                                 + " alors que ton formulaire opte pour du " + verbe
                                 + " . Un petit ajustement s'impose");
                     }
+
                     Class<?> obj = Class.forName(value.getClassName());
+                    traitementAuth(null,obj,req);
                     Object objInstance = obj.getDeclaredConstructor().newInstance();
                     Field[] fields = obj.getDeclaredFields();
                     for (Field field : fields) {
@@ -181,6 +256,9 @@ public class FrontController extends HttpServlet {
                             field.set(objInstance, customSession);
                         }
                     }
+
+                    Method meth = Reflection.getMethode(objInstance, value.getVerbeAction().get(idVerbeMethode).getMethodName());
+                    traitementAuth(meth,null,req);
 
                     if (Reflection.findParam(objInstance, value.getVerbeAction().get(idVerbeMethode).getMethodName())) {
                         Parameter[] objParametre = Reflection.getParam(objInstance,value.getVerbeAction().get(idVerbeMethode).getMethodName());
@@ -354,6 +432,7 @@ public class FrontController extends HttpServlet {
                                             List<String> valeur = entree.getValue();
                                             req.setAttribute(cle, valeur);
                                         }
+
                                         req.getServletContext().getRequestDispatcher(referer).forward(req, res);
                                     } else {
                                         this.setStatusCode("405");
